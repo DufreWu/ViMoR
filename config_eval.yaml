@@ -1,0 +1,61 @@
+# Test models
+model:
+  qwen3.5_0.8b: "./llm_models/Qwen3.5-0.8B-Q4_K_M.gguf"
+  qwen2.5_3b: "./llm_models/qwen2.5-3b-instruct-q4_k_m.gguf"
+  qwen3VL_2b: "./llm_models/Qwen3VL-2B-Instruct-Q4_K_M.gguf"
+  llama3.2_1b: "./llm_models/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+
+llama_dir: 
+  bench: "/opt/llama.cpp/build/bin/llama-bench"
+
+tokens_param:
+  prefill: 32
+  decode: 32
+
+sample_interval: 0.01
+
+motor:
+  v_min: 0.5
+  v_max: 5.0
+  v_step: 0.5
+
+jetson_orin_nx_16g:
+  cpu_cores_num: 8
+  cpu_path: "/sys/devices/system/cpu"
+  gpu_path: "/sys/devices/platform/17000000.gpu/devfreq/17000000.gpu"
+  mem_path: "/sys/kernel/debug/bpmp/debug/clk/emc"
+  emc_cap_path: "/sys/kernel/nvpmodel_clk_cap/emc"
+
+# 268800, 422400, 576000, 729600, 883200, 1036800,
+  cpu_freqs: [422400, 576000, 729600, 883200, 1036800, 1190400, 1344000, 1497600, 1651200, 1804800, 1958400, 1984000]
+  gpu_freqs: [306000000, 408000000, 510000000, 612000000, 714000000, 816000000, 918000000]
+  mem_freqs: [204000000, 665600000, 1600000000, 2133000000, 2750000000, 3199000000]
+  max_mem_freq: "3199000000"
+
+  ina_path: "/sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon3"
+
+test_param:
+  repeat: 3
+
+experiment:
+  qwen_model: "./llm_models/qwen2.5-3b-instruct-q4_k_m.gguf"
+  model_quantization: "Q4_K_M"
+  yolo_model: "yolov8n"
+  image_size: [640, 640]
+  target_fps: 10
+  frame_deadline_ms: 100
+  llm_workloads:
+    - {prefill: 128, decode: 128}
+    - {prefill: 32, decode: 32}
+    - {prefill: 512, decode: 64}
+    - {prefill: 32, decode: 256}
+  dvfs_scan:
+    cpu_freqs_hz: [422400, 1190400, 1984000]
+    gpu_freqs_hz: [408000000, 714000000, 918000000]
+    mem_freqs_hz: [665600000, 2133000000, 3199000000]
+    repeats: 3
+  interference:
+    llm_slowdown_metric: "relative_latency_increase"
+    yolo_p99_metric: "frame_latency_ms"
+    dmr_metric: "deadline_miss_rate"
+    energy_metric: "Joules"

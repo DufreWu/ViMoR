@@ -1,0 +1,1 @@
+dvfs_group,repeat,cpu_hz,gpu_hz,mem_hz,prefill,decode,workload,LLM Slowdown,YOLO P99 (ms),DMR,Energy (J),nvpmodel,actual_freqs,temperatures_C,model_quantization
