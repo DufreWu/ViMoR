@@ -1,0 +1,14 @@
+dvfs:
+  cpu_freq_mhz: [576, 1190, 1984]
+  gpu_freq_mhz: [306, 612, 918]
+  repetitions: 3
+  warmup_seconds: 10
+  measurement_seconds: 60
+
+jetson:
+  cpu_path: /sys/devices/system/cpu
+  gpu_path: /sys/devices/platform/17000000.gpu/devfreq/17000000.gpu
+  power_sensor_dir: /sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon3
+  cpu_available_frequencies_hz: [422400, 576000, 729600, 883200, 1036800, 1190400, 1344000, 1497600, 1651200, 1804800, 1958400, 1984000]
+  gpu_available_frequencies_hz: [306000000, 408000000, 510000000, 612000000, 714000000, 816000000, 918000000]
+  nvpmodel_path: /sys/devices/platform/host1x/nvpmodel

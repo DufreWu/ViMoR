@@ -1,0 +1,79 @@
+seed: 42
+
+# false = leave CPU/GPU on the current governor (no sysfs writes, no root needed);
+# true  = sweep the dvfs.cpu_freq_mhz x dvfs.gpu_freq_mhz matrix (needs root).
+dvfs_control: false
+
+# W0 = idle baseline (camera streaming, no compute); W1-W7 = every non-empty
+# combination of {yolo, segformer, llm}.
+workloads:
+  W0: []
+  W1: [yolo]
+  W2: [segformer]
+  W3: [llm]
+  W4: [yolo, segformer]
+  W5: [yolo, llm]
+  W6: [segformer, llm]
+  W7: [yolo, segformer, llm]
+
+camera:
+  enabled: true
+  always_on: true       # stream the camera in every workload (incl. W0/W3) so power is comparable
+  name: camera0         # FPS stream (camera0, capture)
+  device: 0             # /dev/video0 = ZED 2i
+  backend: v4l2
+  width: 1344           # ZED 2i side-by-side VGA (2 x 672x376)
+  height: 376
+  fps: 30
+  stereo_crop: left     # null | left | right
+
+apps:
+  yolo:
+    model: YOLOv8n
+    model_path: ./workloads/yolov8n.pt
+    image_size: 640     # letterboxed; actual tensor size is recorded in input_resolution
+    target_fps: 10
+    deadline_ms: 100
+    device: 0
+    dry_run_service_ms: 20
+  segformer:
+    model: SegFormer-B0
+    model_path: ./workloads/segformer-b0-finetuned-ade-512-512
+    image_size: 512
+    target_fps: 5
+    deadline_ms: 200
+    fp16: false
+    dry_run_service_ms: 45
+
+llm:
+  model: Qwen2.5-3B
+  model_path: ./workloads/llm_models/qwen2.5-3b-instruct-q4_k_m.gguf
+  quantization: Q4_K_M  # leave empty to infer from the file name
+  n_gpu_layers: -1      # -1 = offload all layers
+  isolation: process    # process (own CUDA context; required next to PyTorch apps) | thread
+  n_ctx: 2048
+  prompt_tokens: 128
+  decode_tokens: 128    # upper bound on generated tokens
+  stop_at_eos: true     # true: stop early at EOS (max 128); false: always decode exactly decode_tokens
+  sample_interval_ms: 100
+  request_schedule:
+    type: periodic      # closed_loop | periodic | poisson | trace
+    think_time_s: 0.0   # closed_loop: gap after each request
+    interval_s: 15.0    # periodic
+    rate_hz: 0.2        # poisson (arrivals drawn from `seed`)
+    arrivals_s: []      # trace: explicit offsets in seconds
+
+power:
+  sensor_dir: auto      # auto-detect INA3221 hwmon dir (index changes across boots)
+  sample_interval_ms: 100
+
+fps_monitor:
+  window_s: 1.0
+  step_s: 0.5
+
+output_root: outputs/power_monitor
+
+repetitions: 3
+warmup_seconds: 15
+measurement_seconds: 180
+cooldown_seconds: 5
