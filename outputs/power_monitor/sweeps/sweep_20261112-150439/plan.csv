@@ -1,0 +1,9 @@
+order,repetition,workload,cpu_mhz,gpu_mhz,status,run_id,valid,quality_flags,error
+1,1,W0,default,default,completed,W0_cpudefault_gpudefault_rep01_20261112-150441,True,"[""incomplete_tegrastats""]",
+2,1,W1,default,default,completed,W1_cpudefault_gpudefault_rep01_20261112-150823,True,"[""incomplete_tegrastats""]",
+3,1,W2,default,default,completed,W2_cpudefault_gpudefault_rep01_20261112-151209,True,"[""incomplete_tegrastats""]",
+4,1,W3,default,default,completed,W3_cpudefault_gpudefault_rep01_20261112-151601,True,"[""incomplete_tegrastats""]",
+5,1,W4,default,default,completed,W4_cpudefault_gpudefault_rep01_20261112-151949,True,[],
+6,1,W5,default,default,completed,W5_cpudefault_gpudefault_rep01_20261112-152331,True,[],
+7,1,W6,default,default,completed,W6_cpudefault_gpudefault_rep01_20261112-152716,True,[],
+8,1,W7,default,default,completed,W7_cpudefault_gpudefault_rep01_20261112-153101,True,[],
