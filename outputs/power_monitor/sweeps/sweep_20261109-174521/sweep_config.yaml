@@ -1,0 +1,134 @@
+seed: 42
+dvfs_control: false
+workloads:
+  W0: []
+  W1:
+  - yolo
+  W2:
+  - segformer
+  W3:
+  - llm
+  W4:
+  - yolo
+  - segformer
+  W5:
+  - yolo
+  - llm
+  W6:
+  - segformer
+  - llm
+  W7:
+  - yolo
+  - segformer
+  - llm
+camera:
+  enabled: true
+  always_on: true
+  name: camera0
+  device: 0
+  backend: v4l2
+  width: 1344
+  height: 376
+  fps: 30
+  stereo_crop: left
+apps:
+  yolo:
+    model: YOLOv8n
+    model_path: ./workloads/yolov8n.pt
+    image_size: 640
+    target_fps: 10
+    deadline_ms: 100
+    device: 0
+    dry_run_service_ms: 20
+  segformer:
+    model: SegFormer-B0
+    model_path: ./workloads/segformer-b0-finetuned-ade-512-512
+    image_size: 512
+    target_fps: 5
+    deadline_ms: 200
+    fp16: false
+    dry_run_service_ms: 45
+llm:
+  model: Qwen2.5-3B
+  model_path: ./workloads/llm_models/qwen2.5-3b-instruct-q4_k_m.gguf
+  quantization: Q4_K_M
+  n_gpu_layers: -1
+  isolation: process
+  n_ctx: 2048
+  prompt_tokens: 128
+  decode_tokens: 128
+  stop_at_eos: true
+  sample_interval_ms: 100
+  request_schedule:
+    type: periodic
+    think_time_s: 0.0
+    interval_s: 15.0
+    rate_hz: 0.2
+    arrivals_s: []
+power:
+  sensor_dir: auto
+  sample_interval_ms: 200
+telemetry:
+  sample_interval_ms: 200
+  tegrastats: true
+fps_satisfaction_window_s: 1.0
+thermal:
+  max_start_temp_c: 55.0
+  max_wait_s: 300
+quality:
+  freq_tolerance_mhz: 1.0
+  min_freq_lock_rate: 0.99
+  min_sample_coverage: 0.9
+  max_gap_factor: 5.0
+randomize_dvfs_order: true
+fps_monitor:
+  window_s: 1.0
+  step_s: 0.5
+output_root: outputs/power_monitor
+repetitions: 1
+warmup_seconds: 30
+measurement_seconds: 180
+cooldown_seconds: 10
+dvfs:
+  cpu_freq_mhz:
+  - 576
+  - 1190
+  - 1984
+  gpu_freq_mhz:
+  - 306
+  - 612
+  - 918
+  default_governor:
+    cpu: schedutil
+    gpu: nvhost_podgov
+jetson:
+  cpu_path: /sys/devices/system/cpu
+  gpu_path: /sys/devices/platform/17000000.gpu/devfreq/17000000.gpu
+  power_sensor_dir: /sys/bus/i2c/drivers/ina3221/1-0040/hwmon/hwmon3
+  cpu_available_frequencies_hz:
+  - 422400
+  - 576000
+  - 729600
+  - 883200
+  - 1036800
+  - 1190400
+  - 1344000
+  - 1497600
+  - 1651200
+  - 1804800
+  - 1958400
+  - 1984000
+  gpu_available_frequencies_hz:
+  - 306000000
+  - 408000000
+  - 510000000
+  - 612000000
+  - 714000000
+  - 816000000
+  - 918000000
+  nvpmodel_path: /sys/devices/platform/host1x/nvpmodel
+sweep_id: sweep_20261109-174521
+dry_run: false
+no_dvfs: false
+grid: full
+governor_default: false

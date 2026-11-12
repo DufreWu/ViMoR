@@ -64,8 +64,30 @@ llm:
     arrivals_s: []      # trace: explicit offsets in seconds
 
 power:
-  sensor_dir: auto      # auto-detect INA3221 hwmon dir (index changes across boots)
-  sample_interval_ms: 100
+  sensor_dir: auto      # auto-detect INA3221 hwmon dir (index changes across boots); rail 1 = VDD_IN (module input)
+  sample_interval_ms: 200
+
+telemetry:
+  sample_interval_ms: 200   # sysfs (actual clocks, temps, throttle indicators) + tegrastats (util, RAM, EMC)
+  tegrastats: true
+
+# FPS target satisfaction: share of consecutive 1 s windows with FPS_i >= target_i.
+fps_satisfaction_window_s: 1.0
+
+# Optional thermal gate before each run's timed region (reduces carry-over heat).
+# null disables the gate; initial/final temperatures are recorded either way.
+thermal:
+  max_start_temp_c: 55.0    # Tj threshold
+  max_wait_s: 300
+
+# Completeness / quality checks; runs failing a hard check are kept but flagged valid=false.
+quality:
+  freq_tolerance_mhz: 1.0   # requested vs actual OPP
+  min_freq_lock_rate: 0.99  # share of telemetry samples at the requested CPU and GPU clock
+  min_sample_coverage: 0.9  # samples >= 90% of measurement_s / interval
+  max_gap_factor: 5.0       # largest power-sample gap <= 5 x interval
+
+randomize_dvfs_order: true  # shuffle DVFS points within each (repetition, workload), seeded
 
 fps_monitor:
   window_s: 1.0
@@ -73,7 +95,7 @@ fps_monitor:
 
 output_root: outputs/power_monitor
 
-repetitions: 3
-warmup_seconds: 15
+repetitions: 5
+warmup_seconds: 30
 measurement_seconds: 180
-cooldown_seconds: 5
+cooldown_seconds: 10

@@ -136,6 +136,6 @@ def test_dry_run_w0_idle(tmp_path):
     from power_monitor.experiments.interference import load_experiment_config, run_workload
 
     cfg = load_experiment_config()
-    cfg.update(output_root=str(tmp_path), warmup_seconds=0.2, measurement_seconds=0.5)
+    cfg.update(output_root=str(tmp_path), warmup_seconds=0.2, measurement_seconds=1.0)
     result = run_workload("W0", None, None, config=cfg, dry_run=True)
     assert result["workload_apps"] == "idle" and result["power_samples"] >= 3

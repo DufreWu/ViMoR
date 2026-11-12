@@ -115,6 +115,34 @@ class JetsonPowerMonitor:
             energy += avg_power * dt
         return energy
 
+    def integrate_window(self, start: float, end: float, key: str = "power_w") -> Dict[str, Optional[float]]:
+        """Trapezoidal energy over exactly ``[start, end]`` using the actual sample timestamps.
+
+        Uses the samples inside the window plus the nearest sample on either side, with
+        linear interpolation at the window edges (no uniform-interval assumption).
+        Returns ``energy_j``, the time-weighted ``mean_w``, ``covered_s`` (the part of the
+        window bracketed by samples) and ``max_gap_s`` (largest gap between samples).
+        """
+        with self._lock:
+            seq = sorted((float(s["monotonic"]), float(s[key])) for s in self.samples if key in s)
+        if len(seq) < 2 or end <= start:
+            return {"energy_j": None, "mean_w": None, "covered_s": 0.0, "max_gap_s": None}
+        pts: List[tuple] = []
+        for (t0, p0), (t1, p1) in zip(seq, seq[1:]):
+            lo, hi = max(t0, start), min(t1, end)
+            if hi <= lo or t1 <= t0:
+                continue
+            interp = lambda t: p0 + (p1 - p0) * (t - t0) / (t1 - t0)  # noqa: E731
+            pts.append((lo, interp(lo), hi, interp(hi), t1 - t0))
+        energy = sum(0.5 * (pa + pb) * (tb - ta) for ta, pa, tb, pb, _ in pts)
+        covered = sum(tb - ta for ta, _, tb, _, _ in pts)
+        return {
+            "energy_j": energy,
+            "mean_w": energy / covered if covered > 0 else None,
+            "covered_s": covered,
+            "max_gap_s": max((gap for *_, gap in pts), default=None),
+        }
+
     def reset(self) -> None:
         with self._lock:
             self.samples = []

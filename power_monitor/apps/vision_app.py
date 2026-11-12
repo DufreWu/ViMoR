@@ -128,16 +128,46 @@ class PeriodicVisionApp:
             release_idx += 1
         return self.frames
 
-    def summary(self, start: float, end: float) -> Dict[str, Any]:
-        """Latency / deadline metrics for releases inside ``[start, end)``."""
+    def summary(self, start: float, end: float, satisfaction_window_s: float = 1.0) -> Dict[str, Any]:
+        """Latency / deadline / FPS-target metrics for releases inside ``[start, end)``.
+
+        * ``inference_*_ms``: pure model latency (``inference_end - inference_start``).
+        * ``response_*_ms``: release-to-result latency (includes waiting for a frame).
+        * ``fps_q``: Q_i^FPS = processed frames / measurement time / target FPS.
+        * ``fps_satisfaction_rate``: share of consecutive, non-overlapping windows of
+          ``satisfaction_window_s`` (aligned to ``start``) whose FPS_i >= target. A processed
+          frame is attributed to the window of its *scheduled release*, so release-time
+          jitter cannot move a frame across a window boundary and fake a miss.
+        """
         frames = [f for f in self.frames if start <= f["scheduled_release_ts"] < end]
         done = [f for f in frames if not f.get("skipped")]
         resp = [f["response_ms"] for f in done]
+        infer = [(f["inference_end_ts"] - f["inference_start_ts"]) * 1000.0 for f in done]
         e2e = [f["e2e_ms"] for f in done]
         p = self.name
+        duration = end - start
+        n_windows = int(duration / satisfaction_window_s + 1e-9) if satisfaction_window_s > 0 else 0
+        counts = [0] * n_windows
+        for f in done:
+            k = int((f["scheduled_release_ts"] - start) / satisfaction_window_s + 1e-9)
+            if 0 <= k < n_windows:
+                counts[k] += 1
+        window_fps = [c / satisfaction_window_s for c in counts]
+        satisfied = [fps + 1e-9 >= self.target_fps for fps in window_fps]
         return {
+            f"{p}_fps_target": self.target_fps,
+            f"{p}_deadline_ms": self.deadline_ms,
             f"{p}_releases": len(frames),
+            f"{p}_processed_frames": len(done),
             f"{p}_skipped": len(frames) - len(done),
+            f"{p}_fps_q": (len(done) / duration / self.target_fps) if duration > 0 else None,
+            f"{p}_fps_satisfaction_rate": (sum(satisfied) / len(satisfied)) if satisfied else None,
+            f"{p}_fps_satisfaction_windows": len(satisfied),
+            f"{p}_fps_window_min": min(window_fps) if window_fps else None,
+            f"{p}_inference_p50_ms": percentile(infer, 50) if infer else None,
+            f"{p}_inference_p95_ms": percentile(infer, 95) if infer else None,
+            f"{p}_inference_p99_ms": percentile(infer, 99) if infer else None,
+            f"{p}_inference_mean_ms": (sum(infer) / len(infer)) if infer else None,
             f"{p}_response_p50_ms": percentile(resp, 50) if resp else None,
             f"{p}_response_p95_ms": percentile(resp, 95) if resp else None,
             f"{p}_response_p99_ms": percentile(resp, 99) if resp else None,

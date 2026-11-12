@@ -49,11 +49,6 @@ experiment:
     - {prefill: 32, decode: 32}
     - {prefill: 512, decode: 64}
     - {prefill: 32, decode: 256}
-  dvfs_scan:
-    cpu_freqs_hz: [422400, 1190400, 1984000]
-    gpu_freqs_hz: [408000000, 714000000, 918000000]
-    mem_freqs_hz: [665600000, 2133000000, 3199000000]
-    repeats: 3
   interference:
     llm_slowdown_metric: "relative_latency_increase"
     yolo_p99_metric: "frame_latency_ms"

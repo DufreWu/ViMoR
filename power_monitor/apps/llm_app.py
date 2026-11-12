@@ -210,18 +210,24 @@ class LlmApp:
         return self.requests
 
     def _run_request(self, request_id: str, arrival: float, hard_end: float) -> Dict[str, Any]:
+        """Status: ``completed``; ``truncated`` (cut off by the end of the run / a stop - not a
+        failure); ``failed`` (the backend raised - counted in the failure rate)."""
         prompt = self.backend.make_prompt(self.prompt_tokens, self.rng)
         start = time.monotonic()
         token_ts: List[float] = []
         status = "completed"
-        for _ in self.backend.stream(prompt, self.decode_tokens):
-            stamp = time.monotonic()
-            token_ts.append(stamp)
-            if self.token_stream is not None:
-                self.token_stream.tick(ts=stamp)
-            if self._stop.is_set() or stamp >= hard_end:
-                status = "aborted" if len(token_ts) < self.decode_tokens else "completed"
-                break
+        error = None
+        try:
+            for _ in self.backend.stream(prompt, self.decode_tokens):
+                stamp = time.monotonic()
+                token_ts.append(stamp)
+                if self.token_stream is not None:
+                    self.token_stream.tick(ts=stamp)
+                if self._stop.is_set() or stamp >= hard_end:
+                    status = "truncated" if len(token_ts) < self.decode_tokens else "completed"
+                    break
+        except Exception as exc:  # one bad request must not end the run; it is a request failure
+            status, error = "failed", repr(exc)
         end_ts = time.monotonic()
         first = token_ts[0] if token_ts else None
         n = len(token_ts)
@@ -240,6 +246,7 @@ class LlmApp:
             "e2e_ms": (end_ts - arrival) * 1000.0,
             "decode_tps": ((n - 1) / (token_ts[-1] - first)) if n >= 2 and token_ts[-1] > first else None,
             "status": status,
+            "error": error,
             "token_ts": token_ts,
         }
 
@@ -294,26 +301,52 @@ class LlmApp:
         return rows
 
     def summary(self, start: float, end: float) -> Dict[str, Any]:
-        """Requests that *arrived* inside the window and completed; token rate over the window."""
-        done = [r for r in self.requests if start <= r["arrival_ts"] < end and r["status"] == "completed"]
+        """Metrics over requests that *arrived* inside ``[start, end)``.
+
+        Timing comes from streaming token timestamps (one ``time.monotonic()`` stamp per
+        generated token), so TTFT/TPOT are measured, not approximated:
+          TTFT  = first token - service start (queueing is reported separately as queue_ms)
+          TPOT  = (last token - first token) / (n - 1)   (excludes the first token)
+          decode throughput = (n - 1) / (last token - first token)
+          e2e   = last token - arrival
+        Failure rate = failed / (arrived - truncated). Requests truncated by the end of the
+        run are reported separately and are neither completions nor failures.
+        """
+        arrived = [r for r in self.requests if start <= r["arrival_ts"] < end]
+        done = [r for r in arrived if r["status"] == "completed"]
+        failed = [r for r in arrived if r["status"] == "failed"]
+        truncated = [r for r in arrived if r["status"] == "truncated"]
         tokens = sum(1 for r in self.requests for t in r["token_ts"] if start <= t <= end)
 
-        def stats(key: str) -> Dict[str, float]:
-            values = [r[key] for r in done if r.get(key) is not None]
+        def stats(key: str, scale: float = 1.0, name: Optional[str] = None) -> Dict[str, float]:
+            values = [r[key] * scale for r in done if r.get(key) is not None]
+            name = name or key
             return {
-                f"llm_{key}_mean": (sum(values) / len(values)) if values else None,
-                f"llm_{key}_p50": percentile(values, 50) if values else None,
-                f"llm_{key}_p95": percentile(values, 95) if values else None,
+                f"llm_{name}_mean": (sum(values) / len(values)) if values else None,
+                f"llm_{name}_p50": percentile(values, 50) if values else None,
+                f"llm_{name}_p95": percentile(values, 95) if values else None,
             }
 
+        decided = len(arrived) - len(truncated)
         out: Dict[str, Any] = {
+            "llm_timing_source": "streaming_token_timestamps",
+            "llm_requests_arrived": len(arrived),
             "llm_requests_completed": len(done),
-            "llm_requests_aborted": sum(1 for r in self.requests if r["status"] == "aborted"),
+            "llm_requests_failed": len(failed),
+            "llm_requests_truncated": len(truncated),
+            "llm_failure_rate": (len(failed) / decided) if decided else None,
+            "llm_input_tokens_mean": (sum(r["prompt_tokens"] for r in done) / len(done)) if done else None,
+            "llm_output_tokens_mean": (sum(r["generated_tokens"] for r in done) / len(done)) if done else None,
+            "llm_input_tokens_total": sum(r["prompt_tokens"] for r in done),
+            "llm_output_tokens_total": sum(r["generated_tokens"] for r in done),
             "llm_tokens_in_window": tokens,
             "llm_tokens_per_s": tokens / (end - start) if end > start else 0.0,
         }
-        for key in ("ttft_ms", "tpot_ms", "e2e_ms", "queue_ms"):
-            out.update(stats(key))
+        out.update(stats("ttft_ms"))
+        out.update(stats("tpot_ms"))
+        out.update(stats("decode_tps"))
+        out.update(stats("e2e_ms", 1e-3, "e2e_s"))
+        out.update(stats("queue_ms"))
         return out
 
 

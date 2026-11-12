@@ -1,9 +1,10 @@
 dvfs:
   cpu_freq_mhz: [576, 1190, 1984]
   gpu_freq_mhz: [306, 612, 918]
-  repetitions: 3
-  warmup_seconds: 10
-  measurement_seconds: 60
+  # --governor default: stock dynamic DVFS with the full frequency range (no fixed clock).
+  default_governor:
+    cpu: schedutil
+    gpu: nvhost_podgov
 
 jetson:
   cpu_path: /sys/devices/system/cpu
